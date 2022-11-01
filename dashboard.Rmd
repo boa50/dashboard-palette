@@ -1,0 +1,208 @@
+---
+title: "Chart Palette"
+output: 
+  flexdashboard::flex_dashboard:
+    favicon: "favicon.ico"
+    orientation: columns
+    vertical_layout: fill
+runtime: shiny
+---
+
+```{r global, include=FALSE}
+tags$head(tags$link(rel = "icon", href = "favicon.ico"))
+
+library(flexdashboard)
+library(ggplot2)
+library(treemapify)
+library(dplyr)
+library(stringr)
+library(palmerpenguins)
+data(package = 'palmerpenguins')
+
+colors_default <- list(
+  main = "#1976d2",
+  complementary = "#78909c",
+  divergent = "#f57c00",
+  no_emphasis = "#757575",
+  title = "#616161",
+  axis = "#9e9e9e"
+)
+
+colors_custom <- list(
+  main = reactiveVal(colors_default$main),
+  complementary = reactiveVal(colors_default$complementary),
+  divergent = reactiveVal(colors_default$divergent),
+  no_emphasis = reactiveVal(colors_default$no_emphasis),
+  title = reactiveVal(colors_default$title),
+  axis = reactiveVal(colors_default$axis)
+)
+
+theme_custom <- function(axis_color, title_color) {
+  theme_classic() +
+    theme(plot.title = element_text(hjust = 0, colour = title_color),
+          plot.title.position = "plot",
+          axis.line = element_line(colour = axis_color),
+          axis.ticks = element_line(colour = axis_color),
+          axis.text = element_text(colour = axis_color),
+          axis.title = element_text(colour = axis_color))
+}
+
+default_placeholder <- "Color in #000000 format"
+```
+
+Column {.sidebar}
+-----------------------------------------------------------------------
+
+### Colors
+
+```{r colors}
+textInput("main", label = "Main", value = colors_default$main,
+          placeholder = default_placeholder)
+
+textInput("complementary", label = "Complementary", value = colors_default$complementary,
+          placeholder = default_placeholder)
+
+textInput("divergent", label = "Divergent", value = colors_default$divergent,
+          placeholder = default_placeholder)
+
+textInput("no_emphasis", label = "No Emphasis", value = colors_default$no_emphasis,
+          placeholder = default_placeholder)
+
+textInput("title", label = "Title", value = colors_default$title,
+          placeholder = default_placeholder)
+
+textInput("axis", label = "Axis", value = colors_default$axis,
+          placeholder = default_placeholder)
+
+validate_color <- function(field) {
+  if (str_detect(input[[field]], "^#([A-Fa-f0-9]{6})$")) {
+    colors_custom[[field]](input[[field]])
+  }
+
+  colors_custom[[field]]()
+}
+```
+
+Column
+-----------------------------------------------------------------------
+
+### 
+
+```{r}
+renderPlot({
+  penguins %>%
+    group_by(species) %>%
+    summarise(body_mass_mean = mean(body_mass_g, na.rm = TRUE)) %>% 
+    ggplot(aes(x = species, y = body_mass_mean)) +
+    geom_col(fill = validate_color("main")) +
+    labs(title = "Columns chart title", x = "X axis", y = "Y axis") +
+    scale_y_continuous(expand = expansion(mult = c(.01, .05))) +
+    theme_custom(axis_color = validate_color("axis"),
+                 title_color = validate_color("title"))
+})
+```
+
+###
+
+```{r}
+renderPlot({
+  penguins %>%
+    group_by(species, year) %>%
+    summarise(bill_depth_mean = mean(bill_depth_mm, na.rm = TRUE)) %>%
+    ggplot(aes(x = year, y = bill_depth_mean, fill = species)) +
+    geom_bar(position="fill", stat="identity") +
+    scale_fill_manual(values = c(validate_color("main"),
+                                 validate_color("divergent"),
+                                 validate_color("complementary"))) +
+    labs(title = "Stacked column chart title", x = "X axis", y = "Y axis") +
+    scale_y_continuous(expand = expansion(mult = c(.01, .05))) +
+    theme_custom(axis_color = validate_color("axis"),
+                 title_color = validate_color("title")) +
+    theme(legend.position = "none")
+})
+```
+
+Column
+-----------------------------------------------------------------------
+
+###
+
+```{r}
+year <- c(2020, 2020, 2021, 2021, 2022, 2022, 2023, 2023)
+score <- c(41, 18, 32, 26, 25, 37, 20, 42)
+group <- c("1", "2", "1", "2", "1", "2", "1", "2")
+
+renderPlot({
+  data.frame(year, score, group) %>%
+    ggplot(aes(x = year, y = score)) +
+    geom_line(aes(color = group)) +
+    scale_y_continuous(limits = c(0, 45)) +
+    scale_color_manual(values = c(validate_color("main"),
+                                  validate_color("complementary"))) +
+    labs(title = "Line chart title", x = "X axis", y = "Y axis") +
+    theme_custom(axis_color = validate_color("axis"),
+                 title_color = validate_color("title")) +
+    theme(legend.position = "none")
+})
+```
+
+###
+
+```{r}
+renderPlot({
+  penguins %>%
+    mutate(change_color = ifelse(.$bill_depth_mm > 20, TRUE, FALSE)) %>%
+    ggplot(aes(x = bill_length_mm, y = bill_depth_mm)) +
+    geom_point(size = 3, alpha = 0.5, aes(color = change_color)) +
+    scale_color_manual(values = c(validate_color("no_emphasis"),
+                                  validate_color("main"))) +
+    labs(title = "Scatter chart title", x = "X axis", y = "Y axis") +
+    scale_y_continuous(expand = expansion(mult = c(.01, .05))) +
+    theme_custom(axis_color = validate_color("axis"),
+                 title_color = validate_color("title")) +
+    theme(legend.position = "none")
+})
+```
+
+Column
+-----------------------------------------------------------------------
+
+###
+
+```{r}
+renderPlot({
+  penguins %>%
+    group_by(species) %>%
+    summarise(flipper_length_mean = mean(flipper_length_mm, na.rm = TRUE)) %>%
+    ggplot(aes(area = flipper_length_mean, fill = species, label = species)) +
+    geom_treemap() +
+    geom_treemap_text(colour = "white", size = 15) +
+    scale_fill_manual(values = c(validate_color("main"),
+                                 validate_color("divergent"),
+                                 validate_color("complementary"))) +
+    labs(title = "Treemap chart title") +
+    theme_void() +
+    theme(plot.title = element_text(hjust = 0, colour = validate_color("title")),
+          plot.title.position = "plot") +
+    theme(legend.position = "none")
+})
+```
+
+###
+
+```{r}
+renderPlot({
+  penguins %>%
+    group_by(species) %>%
+    summarise(body_mass_mean = mean(body_mass_g, na.rm = TRUE)) %>%
+    ggplot(aes(x = "", y = body_mass_mean, fill = species)) +
+    geom_bar(stat="identity", width=1) + coord_polar("y") +
+    scale_fill_manual(values = c(validate_color("main"),
+                                 validate_color("divergent"),
+                                 validate_color("complementary"))) +
+    labs(title = "Pie chart title") +
+    theme_void() +
+    theme(plot.title = element_text(hjust = 0, colour = validate_color("title")),
+          plot.title.position = "plot")
+})
+```
